@@ -1,53 +1,49 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace WhatsUpSenderPrototypeApp
 {
     record class Recipient(string Name, string Number, string? Message);
+
     internal class Program
     {
-        
-           
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
-            var path = $"{AppContext.BaseDirectory}Phones.txt";
-
-            // get numbers
-            var recepientList = ParsePhones(path);
-
+            var path = Path.Combine(AppContext.BaseDirectory, "Phones.txt");
+            var recipients = ParsePhones(path);
 
             var options = new ChromeOptions();
-            options.AddArgument($"user-data-dir={AppContext.BaseDirectory}\\wa-profile");
-           
+            // Постоянный профиль Chrome, чтобы вход в WhatsApp по QR сохранялся между запусками
+            options.AddArgument($"user-data-dir={Path.Combine(AppContext.BaseDirectory, "wa-profile")}");
+
             using IWebDriver driver = new ChromeDriver(options);
-            // No implicit wait: mixing it with WebDriverWait causes unpredictable delays.
-            // Each element we need is awaited explicitly below.
+            // Неявное ожидание отключено: вместе с WebDriverWait оно даёт непредсказуемые задержки.
+            // Нужные элементы ждём явно ниже.
             driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
             var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(60));
             var sendButton = By.XPath("//*[local-name()='title' and text()='ic-send-filled']/ancestor::button");
-            // Popup "Phone number shared via url is invalid" has an OK button.
-            // Matched by structure, not text, so it works in any UI language.
+            // В окне "Phone number shared via url is invalid" есть кнопка OK.
+            // Ищем по разметке, а не по тексту, чтобы работало на любом языке интерфейса.
             var invalidNumberPopupButton = By.XPath("//div[@role='dialog']//button");
 
             driver.Navigate().GoToUrl("https://web.whatsapp.com");
 
             int sent = 0, failed = 0;
-            foreach (var item in recepientList)
+            foreach (var item in recipients)
             {
-                // One failed recipient must not stop the whole run
+                // Ошибка на одном получателе не должна останавливать всю рассылку
                 try
                 {
-                    // Escape values so characters like '&', '#', '+' in the message don't break the URL
+                    // Кодируем значения, чтобы символы '&', '#', '+' в сообщении не ломали ссылку
                     var phone = Uri.EscapeDataString(item.Number);
                     var text = Uri.EscapeDataString(item.Message ?? string.Empty);
                     var url = new Uri($"https://web.whatsapp.com/send?phone={phone}&text={text}");
                     driver.Navigate().GoToUrl(url);
 
-                    // Poll until either the send button is ready or the "invalid number" popup appears.
-                    // FindElements (plural) returns an empty list instead of throwing
-                    // NoSuchElementException, so the debugger doesn't break on every poll.
+                    // Ждём, пока появится либо кнопка отправки, либо окно "неверный номер".
+                    // FindElements (во множественном числе) возвращает пустой список, а не бросает
+                    // NoSuchElementException, поэтому отладчик не останавливается на каждой проверке.
                     IWebElement? invalidPopupOk = null;
                     var button = wait.Until(d =>
                     {
@@ -61,7 +57,7 @@ namespace WhatsUpSenderPrototypeApp
 
                     if (ReferenceEquals(button, invalidPopupOk))
                     {
-                        // Close the popup so it doesn't block the next recipient
+                        // Закрываем окно, чтобы оно не мешало следующему получателю
                         button.Click();
                         Console.WriteLine($"[FAIL] {item.Name} ({item.Number}): invalid phone number");
                         failed++;
@@ -76,13 +72,13 @@ namespace WhatsUpSenderPrototypeApp
                 }
                 catch (WebDriverTimeoutException)
                 {
-                    // Send button never appeared: number is not on WhatsApp or the chat didn't load
+                    // Кнопка отправки так и не появилась: номера нет в WhatsApp или чат не загрузился
                     Console.WriteLine($"[FAIL] {item.Name} ({item.Number}): send button not found, number may not be on WhatsApp");
                     failed++;
                 }
                 catch (WebDriverException ex)
                 {
-                    // Any other browser error (click intercepted, stale element, etc.)
+                    // Любая другая ошибка браузера (клик перекрыт, элемент устарел и т.п.)
                     Console.WriteLine($"[FAIL] {item.Name} ({item.Number}): {ex.Message}");
                     failed++;
                 }
@@ -95,26 +91,23 @@ namespace WhatsUpSenderPrototypeApp
 
         private static IReadOnlyCollection<Recipient> ParsePhones(string path)
         {
-            var recepients= new List<Recipient>();
-            // если нет файла уведомляем,надо продумать как выкидывать или завершать апп
+            var recipients = new List<Recipient>();
+            // TODO: корректно завершать приложение, если файла нет
             if (!File.Exists(path))
             {
                 Console.WriteLine("Add phones list in project");
             }
 
-            var lines=File.ReadAllLines(path);
+            var lines = File.ReadAllLines(path);
 
-            
-
-            // create class object
+            // Формат строки: имя,телефон,сообщение
             foreach (var line in lines)
             {
-                var obj = line.Split(',',3);
-                //name,phone,message
-                recepients.Add(new Recipient(obj[0], obj[1].Trim().Replace(" ",""), obj[2]));
+                var parts = line.Split(',', 3);
+                recipients.Add(new Recipient(parts[0], parts[1].Trim().Replace(" ", ""), parts[2]));
             }
 
-            return recepients;
+            return recipients;
         }
     }
 }
