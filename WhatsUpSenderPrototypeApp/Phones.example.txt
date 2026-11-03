@@ -1,0 +1,2 @@
+John,994 00000 0000, Hello John, this is a test message
+Jane,994 00000 0001, Hello Jane, this is a test message

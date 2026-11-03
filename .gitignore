@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Real recipient list (personal phone numbers)
+WhatsUpSenderPrototypeApp/Phones.txt
