@@ -11,7 +11,21 @@ namespace WhatsUpSenderPrototypeApp
         static void Main(string[] args)
         {
             var path = Path.Combine(AppContext.BaseDirectory, "Phones.txt");
+
+            // Проверяем файл до запуска Chrome, чтобы не открывать браузер зря
+            if (!File.Exists(path))
+            {
+                Console.WriteLine($"Файл с номерами не найден: {path}");
+                Console.WriteLine("Скопируйте Phones.example.txt в Phones.txt и заполните его.");
+                return;
+            }
+
             var recipients = ParsePhones(path);
+            if (recipients.Count == 0)
+            {
+                Console.WriteLine("В Phones.txt нет ни одной корректной строки.");
+                return;
+            }
 
             var options = new ChromeOptions();
             // Постоянный профиль Chrome, чтобы вход в WhatsApp по QR сохранялся между запусками
@@ -92,19 +106,36 @@ namespace WhatsUpSenderPrototypeApp
         private static IReadOnlyCollection<Recipient> ParsePhones(string path)
         {
             var recipients = new List<Recipient>();
-            // TODO: корректно завершать приложение, если файла нет
-            if (!File.Exists(path))
-            {
-                Console.WriteLine("Add phones list in project");
-            }
-
             var lines = File.ReadAllLines(path);
 
             // Формат строки: имя,телефон,сообщение
-            foreach (var line in lines)
+            for (int i = 0; i < lines.Length; i++)
             {
-                var parts = line.Split(',', 3);
-                recipients.Add(new Recipient(parts[0], parts[1].Trim().Replace(" ", ""), parts[2]));
+                var lineNumber = i + 1;
+
+                // Пустые строки (например, в конце файла) просто пропускаем
+                if (string.IsNullOrWhiteSpace(lines[i]))
+                    continue;
+
+                var parts = lines[i].Split(',', 3);
+                if (parts.Length < 3)
+                {
+                    Console.WriteLine($"Строка {lineNumber} пропущена: ожидается формат 'имя,телефон,сообщение'.");
+                    continue;
+                }
+
+                var name = parts[0].Trim();
+                // Оставляем только цифры: убираем пробелы, '+', '-', скобки
+                var number = new string(parts[1].Where(char.IsDigit).ToArray());
+                var message = parts[2].Trim();
+
+                if (number.Length == 0 || message.Length == 0)
+                {
+                    Console.WriteLine($"Строка {lineNumber} пропущена: пустой телефон или сообщение.");
+                    continue;
+                }
+
+                recipients.Add(new Recipient(name, number, message));
             }
 
             return recipients;
