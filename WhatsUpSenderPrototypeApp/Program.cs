@@ -22,7 +22,12 @@ namespace WhatsUpSenderPrototypeApp
             options.AddArgument($"user-data-dir={AppContext.BaseDirectory}\\wa-profile");
            
             using IWebDriver driver = new ChromeDriver(options);
-            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(60); // каждый FindElement ждёт до 60 сек
+            // No implicit wait: mixing it with WebDriverWait causes unpredictable delays.
+            // Each element we need is awaited explicitly below.
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
+            var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(60));
+            var sendButton = By.XPath("//*[local-name()='title' and text()='ic-send-filled']/ancestor::button");
+
             driver.Navigate().GoToUrl("https://web.whatsapp.com");
             foreach (var item in recepientList)
             {
@@ -32,10 +37,12 @@ namespace WhatsUpSenderPrototypeApp
                 var url = new Uri($"https://web.whatsapp.com/send?phone={phone}&text={text}");
                 driver.Navigate().GoToUrl(url);
 
-                var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(60)); // ожидальщик загрузки
-
-                // кликаем по иконке 
-                driver.FindElement(By.XPath("//*[local-name()='title' and text()='ic-send-filled']/ancestor::button")).Click();
+                // Poll until the send button is visible and enabled.
+                // FindElements (plural) returns an empty list instead of throwing
+                // NoSuchElementException, so the debugger doesn't break on every poll.
+                var button = wait.Until(d => d.FindElements(sendButton)
+                                              .FirstOrDefault(b => b.Displayed && b.Enabled));
+                button.Click();
                Thread.Sleep(3000);
             }
            
