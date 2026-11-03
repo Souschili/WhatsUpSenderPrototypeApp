@@ -26,7 +26,10 @@ namespace WhatsUpSenderPrototypeApp
             driver.Navigate().GoToUrl("https://web.whatsapp.com");
             foreach (var item in recepientList)
             {
-                var url = new Uri($"https://web.whatsapp.com/send?phone={item.Number}&text={item.Message}");
+                // Escape values so characters like '&', '#', '+' in the message don't break the URL
+                var phone = Uri.EscapeDataString(item.Number);
+                var text = Uri.EscapeDataString(item.Message ?? string.Empty);
+                var url = new Uri($"https://web.whatsapp.com/send?phone={phone}&text={text}");
                 driver.Navigate().GoToUrl(url);
 
                 var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(60)); // ожидальщик загрузки
