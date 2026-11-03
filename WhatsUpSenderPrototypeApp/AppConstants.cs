@@ -1,11 +1,10 @@
-namespace WhatsUpSenderPrototypeApp
+﻿namespace WhatsUpSenderPrototypeApp
 {
     // Все настройки приложения в одном месте: меняем здесь, а не по коду
     internal static class AppConstants
     {
         // Файлы и папки (лежат рядом с exe)
         public const string PhonesFileName = "Phones.txt";
-        public const string PhonesExampleFileName = "Phones.example.txt";
         public const string ChromeProfileFolderName = "wa-profile";
 
         // Адреса WhatsApp Web
@@ -14,7 +13,17 @@ namespace WhatsUpSenderPrototypeApp
 
         // Тайминги
         public static readonly TimeSpan ElementWaitTimeout = TimeSpan.FromSeconds(60);
-        public static readonly TimeSpan DelayBetweenMessages = TimeSpan.FromSeconds(3);
+        // Время на загрузку WhatsApp Web и сканирование QR-кода при первом входе
+        public static readonly TimeSpan LoginWaitTimeout = TimeSpan.FromMinutes(2);
+        // Сколько ждать, пока отправленное сообщение уйдёт (кнопка отправки исчезнет)
+        public static readonly TimeSpan SendConfirmTimeout = TimeSpan.FromSeconds(30);
+        // Случайная пауза между получателями: выбирается в этом диапазоне
+        public static readonly TimeSpan MinDelayBetweenMessages = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan MaxDelayBetweenMessages = TimeSpan.FromSeconds(15);
+
+        // Боковая панель со списком чатов: появляется только после входа.
+        // Ищем по id, а не по тексту, чтобы не зависеть от языка интерфейса.
+        public const string ChatListCssSelector = "#pane-side";
 
         // Локаторы элементов страницы (XPath).
         // Если WhatsApp поменяет разметку, править нужно только здесь.
@@ -28,5 +37,7 @@ namespace WhatsUpSenderPrototypeApp
         // Разбор строк файла с номерами: имя,телефон,сообщение
         public const char PhonesFieldSeparator = ',';
         public const int PhonesFieldCount = 3;
+        // Обязательны только имя и телефон, сообщение можно не указывать
+        public const int PhonesRequiredFieldCount = 2;
     }
 }
