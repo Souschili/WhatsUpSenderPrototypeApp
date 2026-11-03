@@ -10,38 +10,37 @@ namespace WhatsUpSenderPrototypeApp
     {
         static void Main(string[] args)
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "Phones.txt");
+            var path = Path.Combine(AppContext.BaseDirectory, AppConstants.PhonesFileName);
 
             // Проверяем файл до запуска Chrome, чтобы не открывать браузер зря
             if (!File.Exists(path))
             {
                 Console.WriteLine($"Файл с номерами не найден: {path}");
-                Console.WriteLine("Скопируйте Phones.example.txt в Phones.txt и заполните его.");
+                Console.WriteLine($"Скопируйте {AppConstants.PhonesExampleFileName} в {AppConstants.PhonesFileName} и заполните его.");
                 return;
             }
 
             var recipients = ParsePhones(path);
             if (recipients.Count == 0)
             {
-                Console.WriteLine("В Phones.txt нет ни одной корректной строки.");
+                Console.WriteLine($"В {AppConstants.PhonesFileName} нет ни одной корректной строки.");
                 return;
             }
 
             var options = new ChromeOptions();
             // Постоянный профиль Chrome, чтобы вход в WhatsApp по QR сохранялся между запусками
-            options.AddArgument($"user-data-dir={Path.Combine(AppContext.BaseDirectory, "wa-profile")}");
+            var profilePath = Path.Combine(AppContext.BaseDirectory, AppConstants.ChromeProfileFolderName);
+            options.AddArgument($"user-data-dir={profilePath}");
 
             using IWebDriver driver = new ChromeDriver(options);
             // Неявное ожидание отключено: вместе с WebDriverWait оно даёт непредсказуемые задержки.
             // Нужные элементы ждём явно ниже.
             driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
-            var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(60));
-            var sendButton = By.XPath("//*[local-name()='title' and text()='ic-send-filled']/ancestor::button");
-            // В окне "Phone number shared via url is invalid" есть кнопка OK.
-            // Ищем по разметке, а не по тексту, чтобы работало на любом языке интерфейса.
-            var invalidNumberPopupButton = By.XPath("//div[@role='dialog']//button");
+            var wait = new WebDriverWait(driver, AppConstants.ElementWaitTimeout);
+            var sendButton = By.XPath(AppConstants.SendButtonXPath);
+            var invalidNumberPopupButton = By.XPath(AppConstants.InvalidNumberPopupButtonXPath);
 
-            driver.Navigate().GoToUrl("https://web.whatsapp.com");
+            driver.Navigate().GoToUrl(AppConstants.WhatsAppWebUrl);
 
             int sent = 0, failed = 0;
             foreach (var item in recipients)
@@ -52,7 +51,7 @@ namespace WhatsUpSenderPrototypeApp
                     // Кодируем значения, чтобы символы '&', '#', '+' в сообщении не ломали ссылку
                     var phone = Uri.EscapeDataString(item.Number);
                     var text = Uri.EscapeDataString(item.Message ?? string.Empty);
-                    var url = new Uri($"https://web.whatsapp.com/send?phone={phone}&text={text}");
+                    var url = new Uri($"{AppConstants.WhatsAppSendUrl}?phone={phone}&text={text}");
                     driver.Navigate().GoToUrl(url);
 
                     // Ждём, пока появится либо кнопка отправки, либо окно "неверный номер".
@@ -82,7 +81,7 @@ namespace WhatsUpSenderPrototypeApp
 
                     Console.WriteLine($"[OK]   {item.Name} ({item.Number})");
                     sent++;
-                    Thread.Sleep(3000);
+                    Thread.Sleep(AppConstants.DelayBetweenMessages);
                 }
                 catch (WebDriverTimeoutException)
                 {
@@ -117,8 +116,8 @@ namespace WhatsUpSenderPrototypeApp
                 if (string.IsNullOrWhiteSpace(lines[i]))
                     continue;
 
-                var parts = lines[i].Split(',', 3);
-                if (parts.Length < 3)
+                var parts = lines[i].Split(AppConstants.PhonesFieldSeparator, AppConstants.PhonesFieldCount);
+                if (parts.Length < AppConstants.PhonesFieldCount)
                 {
                     Console.WriteLine($"Строка {lineNumber} пропущена: ожидается формат 'имя,телефон,сообщение'.");
                     continue;
